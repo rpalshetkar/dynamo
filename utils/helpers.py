@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime
-import json
 import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, TypeAlias
@@ -12,16 +10,7 @@ import yaml
 from flatten_dict import flatten
 from icecream import ic
 
-from tests.sandbox.utils.io import (
-    icf,
-    io_stream,
-    parse_content,
-    read_json,
-    read_yaml,
-)
-
 _NO_XLATIONS_SPECIALS = ['LOB', 'PL', 'PI']
-
 
 XlationMap: TypeAlias = Dict[str, Dict[str, str]]
 ic.configureOutput(prefix='DEBUG:', includeContext=True)
@@ -85,55 +74,6 @@ def is_pivot(df: pd.DataFrame) -> bool:
     return index_pivoted or column_pivoted
 
 
-def parse_url(url: str) -> Dict[str, Any]:
-    parsed_url = urlparse(url)
-    qs = parse_qs(parsed_url.query)
-
-    def parse_nested_qs(qs: Dict[str, List[str]]) -> Dict[str, Any]:
-        result = {}
-        for k, v in qs.items():
-            keys = k.split('.')
-            d = result
-            for key in keys[:-1]:
-                d = d.setdefault(key, {})
-            d[keys[-1]] = v[0].split(',') if ',' in v[0] else v[0]
-        return result
-
-    return parse_nested_qs(qs)
-
-
-def io_dict(**kwargs: Any) -> Dict[str, Any]:
-    if {'file', 'content', 'url'} <= kwargs.keys():
-        raise ValueError(
-            "Only one of 'file', 'content', or 'url' should be provided"
-        )
-
-    if 'file' in kwargs:
-        file_path = str(kwargs['file'])
-        content = io_stream(file=file_path)
-        if file_path.lower().endswith(('.yaml', '.yml')):
-            data = read_yaml(content)
-        elif file_path.lower().endswith('.json'):
-            data = read_json(content)
-        else:
-            raise ValueError(f'Unsupported file format: {file_path}')
-
-    elif 'content' in kwargs:
-        data = parse_content(kwargs['content'])
-
-    elif 'url' in kwargs:
-        data = parse_content(parse_url(kwargs['url']))
-
-    else:
-        icf(f'Creating data from kwargs: {kwargs}')
-        data = kwargs
-
-    if data is None:
-        raise ValueError('No data returned')
-
-    return data
-
-
 def flat(data):
     if isinstance(data, list):
         return flatten(
@@ -151,3 +91,12 @@ def flat(data):
             }
         )
     return data
+
+
+def typed_list(
+    dtype: type, values: Optional[str | List[Any]]
+) -> Optional[List[Any]]:
+    if values is None:
+        return None
+    vals: List[Any] = values.split(',') if isinstance(values, str) else values
+    return [dtype(v) for v in vals]

@@ -1,21 +1,21 @@
-import logging
-from pprint import pprint as pp
-from typing import Any
-
-logger = logging.getLogger(__name__)
-logger.info('This is an info message.')
-
 import os
 import sys
+from pprint import pp
+from typing import Any, Optional
+
+from icecream import ic
+from loguru import logger
+from pydantic import BaseModel
+
+ic.configureOutput(prefix='DEBUG:', includeContext=True)
 
 
-class Logger:
+class AppLogger:
     def __init__(self):
         self.configure_logger()
 
     def configure_logger(self):
         logger.remove()
-        logging.basicConfig(level=logging.INFO)
         environment = os.getenv('env', 'development')
         self.set_logging_level(environment)
 
@@ -48,15 +48,4 @@ class Logger:
         logger.critical(message)
 
 
-log = Logger()
-
-
-def pprint_obj(obj: Any, indent: int = 2) -> None:
-    for key, value in attr.asdict(obj).items():
-        if isinstance(value, dict) and all(
-            isinstance(v, dict) for v in value.values()
-        ):
-            ic(f"{'  ' * indent}{key}:")
-            pprint_obj(value, indent + 1)
-        else:
-            ic(f"{'  ' * indent}{key}: {value}")
+log = AppLogger()
