@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 
-from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
+from pydantic.v1 import BaseModel, Field, create_model
+from pydantic.v1.class_validators import root_validator
 
 from core.proxies import PROXY_MAP
 from utils.field import field_specs
@@ -48,8 +49,8 @@ def _after(cls, obj):
 
 
 def _str_tolist(cls, values):
-    for name, field in cls.model_fields.items():
-        extra = field.json_schema_extra
+    for name, field in cls.__fields__.items():
+        extra = field.field_info.extra
         if extra.get('flags', {}).get('list') and values.get(name):
             values[name] = typed_list(extra['itype'], values[name])
         defval = extra.get('defval')
@@ -59,7 +60,7 @@ def _str_tolist(cls, values):
     return values
 
 
-def dynamic_model(data: Dict[str, Any]) -> BaseModel:
+def dynamic_model_v1(data: Dict[str, Any]) -> BaseModel:
     fields = {}
     assert data.get('kind'), 'Kind is required'
     cls_spec = data.get('kind').split('#')
@@ -68,14 +69,14 @@ def dynamic_model(data: Dict[str, Any]) -> BaseModel:
     for key, value in data.items():
         meta = {}
         if isinstance(value, dict):
-            field_type = dynamic_model(value)
+            field_type = dynamic_model_v1(value)
             meta = {
                 'dtype': field_type,
                 'required': 'req' in cls_spec[1],
                 'defval': None if 'req' not in cls_spec[1] else ...,
             }
         elif isinstance(value, list):
-            field_type = List[dynamic_model(value[0])]
+            field_type = List[dynamic_model_v1(value[0])]
             meta = {'dtype': field_type}
         else:
             meta = field_specs(value)
@@ -83,11 +84,11 @@ def dynamic_model(data: Dict[str, Any]) -> BaseModel:
             if 'req' in meta.get('flags', {}):
                 meta['required'] = True
 
-        fields[key] = (field_type, Field(..., json_schema_extra=meta))
+        fields[key] = (field_type, Field(..., **meta))
 
-    fields['__validators__'] = {
-        'before': model_validator(mode='before')(_before),
-        'after': model_validator(mode='after')(_after),
+    fields['__root_validators__'] = {
+        root_validator(pre=True)(_before),
+        root_validator(pre=False)(_after),
     }
 
     try:
@@ -95,6 +96,11 @@ def dynamic_model(data: Dict[str, Any]) -> BaseModel:
     except Exception as e:
         ic(f'Error creating model {cls_name}: {e}')
         raise e
-    model.model_config = ConfigDict(extra='forbid', strict=True)
+
+    class Config:
+        extra = 'forbid'
+        strict = True
+
+    model.Config = Config
     log.info(f'Creating model for {cls_name} {model}')
     return model

@@ -65,8 +65,8 @@ def field_specs(
             val = match['k_type']
             results.update({'type': val})
         if match.get('v_type'):
-            default = match['v_type']
-            results.update({'default': default})
+            defval = match['v_type']
+            results.update({'defval': defval})
         if match.get('k_flag'):
             results['flags'].update({match['k_flag']: True})
         for key in _MODIFIERS.keys():
@@ -89,11 +89,11 @@ def post_fix(results: Dict[str, Any]) -> Dict[str, Any]:
     dtype = results.get('type', 'str')
     itype: type = _TYPE_MAP.get(dtype, dtype)
     results['type'] = itype
-    default = results.get('default')
+    defval = results.get('defval')
     if flags.get('list'):
         results['type'] = List[itype]
-        if default:
-            results['default'] = typed_list(itype, default)
+        if defval:
+            results['defval'] = typed_list(itype, defval)
     dtypes = {
         'ops_num': int,
         'ops_str': str,
