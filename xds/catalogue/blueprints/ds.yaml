@@ -1,0 +1,22 @@
+kind: DS
+proxy: DSProxy
+uri: str=txf://xbow
+http: xref=http
+txf: xref=xbow
+qz: xref=qz
+rapi: xref=rapi
+brisk: xref=brisk
+hr: xref=hr
+xls: xref=xls
+csv: xref=csv
+callable: xref=callable
+memory: xref=memory
+mongo: xref=mongo
+
+path: xref=/Users/john/xds/data/file.xls
+parser: xref=callable
+
+sets: str=droplets,trades,legs,events,orders,measures,positions,ticks,logs#list
+
+acl: str=ro
+roles: str=admin,user#list

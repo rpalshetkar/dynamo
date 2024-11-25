@@ -1,0 +1,20 @@
+import attr
+@attr.s
+
+class {{ cls_id }}:
+{% for field in fields %}
+    {{ field.name }}: {{ field.type }}{% if field.default is not none %} = "{{ field.default }}"{% endif %}
+{% endfor %}
+
+    def __init__(self, **kwargs):
+{% for field in fields %}
+        {% if field.is_nested %}
+        self.{{ field.name }} = {{ field.type }}(
+            {% for subfield in field.subfields %}
+            {{ subfield.name }}=kwargs.get('{{ field.name }}.{{ subfield.name }}', None),
+            {% endfor %}
+        )
+        {% else %}
+        self.{{ field.name }} = kwargs.get('{{ field.name }}', None)
+        {% endif %}
+{% endfor %}

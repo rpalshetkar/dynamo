@@ -1,0 +1,3 @@
+kind: Callable
+args: list
+kwargs: dict

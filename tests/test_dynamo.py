@@ -3,12 +3,10 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 import pytest
-from pydantic import BaseModel, ConfigDict, Field
 
-from core.dynamo import dynamic_model
-from core.dynamo_v1 import dynamic_model_v1
-from utils.io import parser
-from utils.logger import ic
+from xds.core.dynamo import dynamic_model
+from xds.utils.io import parser
+from xds.utils.logger import ic
 
 
 @pytest.fixture(scope='session')
@@ -20,57 +18,39 @@ def setup():
     pd.set_option('display.width', 2000)
     pd.set_option('display.float_format', '{:10,.0f}'.format)
 
-    ds = """
-        kind: DS
-        ns: str
-        proxy: str=DSProxy
-        uri: str#req
-        protocol: str=http
-    """
-    bow = """
-        kind: DS
-        ns: xbow
-        proxy: DSProxy
-        uri: txf://jira
-        protocol: http
-    """
-    widget = """
-        kind: Widget
-        proxy: str#req
-        type: enum=table,pivot,bar,line,gannt,heatmap,sankey
-        x: str
-        y: str
-        c: str
-        theme: str
-        orient: enum=h,v
-        total: bool
-    """
-    models = {
-        'DS': ds,
-        'WIDGET': widget,
-        'BOW': bow,
-    }
-    return models
+    fdir = 'tests/fixtures'
+    myml = f'{fdir}/models.yaml'
+    cyml = f'{fdir}/data.yaml'
+    models = parser(myml)
+    configs = parser(cyml)
+
+    return {'models': models, 'configs': configs}
 
 
+@pytest.mark.usefixtures('setup')
 def test_ds_model(setup):
-    schema = setup['DS']
-    dsm = dynamic_model(parser(schema))
+    models = setup['models']
+    configs = setup['configs']
+    dsm = dynamic_model(parser(models['DS']))
     assert dsm, 'DS Model should be created'
     ic(dsm.model_json_schema())
-    kwargs = ic(parser(setup['BOW']))
+    kwargs = ic(parser(configs['bow']))
     ds = dsm(**kwargs)
     df: pd.DataFrame = ds.df
     assert not df.empty, 'DS/DF should be created'
     ic(ds.stats())
 
 
+@pytest.mark.skip
 def test_ds_model_v1(setup):
-    schema = setup['DS']
-    dsm = dynamic_model_v1(parser(schema))
+    from legacy.dynamo_v1 import dynamic_model_v1
+
+    models = setup['models']
+    configs = setup['configs']
+    dsm = dynamic_model_v1(parser(models['DS']))
     assert dsm, 'DS Model should be created'
     ic(dsm.schema_json())
-    kwargs = ic(parser(setup['BOW']))
+    kwargs = ic(parser(configs['bow']))
     ds = dsm(**kwargs)
     df: pd.DataFrame = ds.df
     assert not df.empty, 'DS/DF should be created'

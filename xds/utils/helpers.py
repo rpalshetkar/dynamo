@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, TypeAlias
 from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
-import yaml
 from flatten_dict import flatten
 from icecream import ic
+from jinja2 import Environment, Template
+
+from xds.utils.io import io_buffer
 
 _NO_XLATIONS_SPECIALS = ['LOB', 'PL', 'PI']
 
@@ -100,3 +103,20 @@ def typed_list(
         return None
     vals: List[Any] = values.split(',') if isinstance(values, str) else values
     return [dtype(v) for v in vals]
+
+
+@lru_cache(maxsize=100)
+def jinja_template(
+    template: str, tdir: str = 'xds/catalogue/templates'
+) -> Template:
+    jtemplate = f'{template}.jinja2'
+    tpath = f'{tdir}/{jtemplate}'
+    return Template(io_buffer(file=tpath))
+
+
+def jinja_render(
+    template: Optional[str] = None, data: Optional[Any] = None, **kwargs: Any
+) -> str:
+    template = template or kwargs.get('template')
+    template = jinja_template(template)
+    return template.render(**kwargs)

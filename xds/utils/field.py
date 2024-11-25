@@ -5,12 +5,13 @@ from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional
 
 from icecream import ic
+from pydantic import UUID1
 
-from utils.helpers import typed_list
+from xds.utils.helpers import typed_list
 
 _MODIFIERS = {
-    'type': 'int|float|bool|str|date|time|datetime',
-    'flag': 'req|uniq|key|ro|hide|secret|fuzzy|multi|list',
+    'type': 'int|float|bool|str|date|time|datetime|uuid',
+    'flag': 'req|uniq|key|ro|hide|secret|fuzzy|multi|list|dict',
     'ops_num': 'rank|lines',
     'ops_str': 'has|end|start',
     'ops_type': 'le|ge|gt|lt|max|min|ne|eq',
@@ -30,9 +31,11 @@ _TYPE_MAP = {
     'float': float,
     'str': str,
     'bool': bool,
+    'datetime': datetime,
     'date': datetime.date,
     'time': datetime.time,
     'dt': datetime,
+    'uuid': UUID1,
 }
 
 _LIST_OPS = {

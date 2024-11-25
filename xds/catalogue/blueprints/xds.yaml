@@ -1,0 +1,6 @@
+kind: XDS
+protocol: str#in=service,agent,function,command,browser,scheduler
+uri: str
+env: str
+ds: str
+widget: str

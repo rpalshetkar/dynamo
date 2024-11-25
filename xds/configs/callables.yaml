@@ -1,0 +1,18 @@
+kind: Callables
+callables:
+  - fn: ds_humanize
+    ds: ds.xbow
+    humanized: True
+  - fn: ds_join
+    dsl: ds.xbow
+    dsr: ds.xpeople
+    dslkey: ds.assignee
+    dsrkey: nbk
+  - fn: ds_concat
+    ds: ds.xbow
+    concat: headline=area-headline,due_date=due_date-end_date
+  - fn: ds_theme
+    ds: ds.xbow
+    rag: due_date=T+10,T+30,T+60
+  - fn: ds_rule_xform
+    xlation: ds.vxlation

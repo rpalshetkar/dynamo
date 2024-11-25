@@ -3,10 +3,10 @@ from typing import Any, Dict, List
 from pydantic.v1 import BaseModel, Field, create_model
 from pydantic.v1.class_validators import root_validator
 
-from core.proxies import PROXY_MAP
-from utils.field import field_specs
-from utils.helpers import typed_list
-from utils.logger import ic, log
+from xds.core.proxies import PROXY_MAP
+from xds.utils.field import field_specs
+from xds.utils.helpers import typed_list
+from xds.utils.logger import ic, log
 
 
 def proxy_method(method):
@@ -16,6 +16,7 @@ def proxy_method(method):
     return wrapper
 
 
+@root_validator(pre=True)
 def _before(cls, values):
     try:
         values = _str_tolist(cls, values)
@@ -23,20 +24,23 @@ def _before(cls, values):
         ic(
             f'Error validationg attributes before creation of object for {cls}: {e}'
         )
+    log.info(f'BEFORE {cls}: Attributes {values}')
     return values
 
 
-def _after(cls, obj):
+@root_validator(pre=False)
+def _after(cls, values):
+    log.info(f'Validating attributes AFTER {cls}: {values}')
     try:
-        proxy = obj.proxy
+        proxy = values.get('proxy')
         if proxy:
             dcls: Any = PROXY_MAP.get(proxy)
             if not dcls:
                 raise ValueError(
                     f'Proxy class {proxy} not found in {PROXY_MAP}'
                 )
-            inst = dcls.create(**obj.__dict__)
-            obj.__proxied__ = inst
+            inst = dcls.create(**values)
+            cls.__proxied__ = inst
             for export in inst.exports:
                 val = getattr(inst, export)
                 if callable(val):
@@ -44,8 +48,9 @@ def _after(cls, obj):
                 else:
                     setattr(cls, export, val)
     except Exception as e:
-        ic(f'Error setting proxy method {export} for {cls}: {e}')
-    return obj
+        ic(f'Error while class setting {cls}: {e}')
+    log.info(f'AFTER {cls}: Attributes {values}')
+    return values
 
 
 def _str_tolist(cls, values):
@@ -86,13 +91,12 @@ def dynamic_model_v1(data: Dict[str, Any]) -> BaseModel:
 
         fields[key] = (field_type, Field(..., **meta))
 
-    fields['__root_validators__'] = {
-        root_validator(pre=True)(_before),
-        root_validator(pre=False)(_after),
-    }
-
     try:
-        model = create_model(cls_name, **fields)
+        model = create_model(
+            cls_name,
+            **fields,
+            __validators__={'before': _before, 'after': _after},
+        )
     except Exception as e:
         ic(f'Error creating model {cls_name}: {e}')
         raise e

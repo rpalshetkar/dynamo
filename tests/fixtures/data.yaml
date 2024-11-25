@@ -1,0 +1,5 @@
+bow:
+  kind: DS
+  ns: xbow
+  uri: txf://jira
+  protocol: http

@@ -1,0 +1,28 @@
+DS:
+  kind: DS
+  ns: str
+  proxy: str=DSProxy
+  uri: str#req
+  protocol: str=http
+
+Widget:
+  kind: Widget
+  proxy: str=WidgetProxy
+  type: enum=table,pivot,bar,line,gannt,heatmap,sankey
+  x: str
+  y: str
+  c: str
+  t: str
+  theme: str
+  orient: enum=h,v
+  total: bool
+
+Env:
+  kind: Env
+  ns: str=production
+  uri: str#req
+
+Registry:
+  kind: Registry
+  ns: str=registry
+  models: str=ds,widget,env,registry

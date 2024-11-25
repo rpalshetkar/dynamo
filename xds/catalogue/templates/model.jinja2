@@ -1,0 +1,9 @@
+
+Model: {{ model.__class__.__name__ }}
+{% for name, field in model.model_fields.items() -%}
+  {{ name }}: {{ field.annotation }}
+  {% if field.json_schema_extra -%}
+    extra: {{ field.json_schema_extra }}
+  {% endif -%}
+    default: {% if field.default == Ellipsis %}Required{% else %}{{ field.default }}{% endif %}
+{% endfor -%}
