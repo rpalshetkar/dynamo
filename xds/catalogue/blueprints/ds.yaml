@@ -1,22 +1,16 @@
 kind: DS
-proxy: DSProxy
-uri: str=txf://xbow
-http: xref=http
-txf: xref=xbow
-qz: xref=qz
-rapi: xref=rapi
-brisk: xref=brisk
-hr: xref=hr
-xls: xref=xls
-csv: xref=csv
-callable: xref=callable
-memory: xref=memory
-mongo: xref=mongo
+proxy: str=DSProxy
+uri: str=txf://xbow#any
+http: xref=HttpDS#any
+txf: xref=TxfDS#any
+qz: xref=QzDS#any
+file: xref=FileDS#any
+kudu: xref=KuduDS#any
+memory: xref=MemoryDS#any
+mongo: xref=MongoDS#any
+callable: xref=CallableDS#any
+bucket: xref=BucketDS#any
 
-path: xref=/Users/john/xds/data/file.xls
-parser: xref=callable
-
-sets: str=droplets,trades,legs,events,orders,measures,positions,ticks,logs#list
-
-acl: str=ro
-roles: str=admin,user#list
+acl: str=r#enum=r,w,o
+roles: str=core#list
+validators: str=callables#list

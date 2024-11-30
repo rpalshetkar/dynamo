@@ -10,13 +10,13 @@ from pydantic import UUID1
 from xds.utils.helpers import typed_list
 
 _MODIFIERS = {
-    'type': 'int|float|bool|str|date|time|datetime|uuid',
-    'flag': 'req|uniq|key|ro|hide|secret|fuzzy|multi|list|dict',
+    'type': 'int|float|bool|str|date|time|datetime|uuid|xref',
+    'enum_type': 'in|enum|range',
+    'flag': 'req|uniq|key|ro|hide|secret|fuzzy|multi|list|dict|any|all|sys',
     'ops_num': 'rank|lines',
     'ops_str': 'has|end|start',
     'ops_type': 'le|ge|gt|lt|max|min|ne|eq',
-    'ux_str': 'color|heatmap|xref|href',
-    'lst_type': 'in|enum|range',
+    'ux_str': 'color|heatmap|href',
 }
 
 _MODIFIERS_PATTERN = re.compile(
@@ -36,6 +36,7 @@ _TYPE_MAP = {
     'time': datetime.time,
     'dt': datetime,
     'uuid': UUID1,
+    'xref': Any,
 }
 
 _LIST_OPS = {
@@ -91,16 +92,26 @@ def post_fix(results: Dict[str, Any]) -> Dict[str, Any]:
     flags = results.get('flags', {})
     dtype = results.get('type', 'str')
     itype: type = _TYPE_MAP.get(dtype, dtype)
-    results['type'] = itype
     defval = results.get('defval')
+    if dtype == 'xref':
+        itype = defval
+        defval = None
+    results['type'] = itype
+    results['defval'] = defval
     if flags.get('list'):
         results['type'] = List[itype]
         if defval:
             results['defval'] = typed_list(itype, defval)
+    if flags.get('dict'):
+        results['type'] = Dict[str, Any]
+    if results.get('enum_type'):
+        enums = next(iter(results['enum_type'].values()))
+        results['enums'] = typed_list(itype, enums)
     dtypes = {
         'ops_num': int,
         'ops_str': str,
         'ops_type': itype,
+        'enum_type': itype,
         'lst_type': itype,
         'ux_str': itype,
     }

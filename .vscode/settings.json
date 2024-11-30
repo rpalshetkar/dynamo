@@ -21,6 +21,7 @@
   "python.testing.unittestEnabled": false,
   "python.testing.nosetestsEnabled": false,
   "python.testing.pytestArgs": [
+    "-s",
     "tests"
   ],
   "workbench.colorCustomizations": {

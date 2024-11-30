@@ -1,9 +1,10 @@
 
-Model: {{ model.__class__.__name__ }}
-{% for name, field in model.model_fields.items() -%}
-  {{ name }}: {{ field.annotation }}
-  {% if field.json_schema_extra -%}
-    extra: {{ field.json_schema_extra }}
-  {% endif -%}
-    default: {% if field.default == Ellipsis %}Required{% else %}{{ field.default }}{% endif %}
-{% endfor -%}
+---------------------------------------------------------
+Model: {{model}}
+---------------------------------------------------------
+{% for name, field in model.model_fields.items() %}
+  {{name}}: <TYPE {{field.annotation}}>
+    {% if field.json_schema_extra %} Field Metadata: {{field.json_schema_extra}} {% endif -%}
+    {% if field.default == Ellipsis %} Required {% endif %}
+    {% if field.default is not none and field.default != PydanticUndefined %} Default: {{field.default}} {% endif %}
+{% endfor %}

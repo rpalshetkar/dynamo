@@ -6,13 +6,17 @@ from typing import Any, Optional
 from icecream import ic
 from loguru import logger
 from pydantic import BaseModel
+from pprint import pformat
 
-ic.configureOutput(prefix='DEBUG:', includeContext=True)
-
+ic.configureOutput(
+    prefix='DEBUG:\n',
+    includeContext=True,
+    #outputFunction=pformat,
+)
 
 class AppLogger(BaseModel):
-    level: str = 'DEBUG'
-    format: str = '{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}'
+    level: str = 'WARNING'
+    format: str = '{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}'
     stream: Any = None
 
     def __init__(self, **kwargs: Any):
@@ -27,6 +31,7 @@ class AppLogger(BaseModel):
 
     def set_logging_level(self, environment: str) -> None:
         level = self.level if environment == 'production' else 'DEBUG'
+        level = 'DEBUG'
         self._add_handler(self.stream, level)
 
     def _add_handler(self, stream: Any, level: str) -> None:

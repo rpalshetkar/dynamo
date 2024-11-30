@@ -1,6 +1,6 @@
 kind: Widget
-proxy: WidgetProxy
-ds: DS
+proxy: str=WidgetProxy
+ds: xref=DS
 title: I am the widget
 type: table
 x: Fields or X axis columns

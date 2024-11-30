@@ -3,17 +3,34 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from pathlib import Path
+from pprint import pformat
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, TypeAlias
 from urllib.parse import parse_qs, urlparse
 
+import flatten_dict
 import pandas as pd
-from flatten_dict import flatten
+from flatten_dict import flatten, unflatten
+from flatten_dict.reducers import make_reducer
+from flatten_dict.splitters import make_splitter
 from icecream import ic
 from jinja2 import Environment, Template
 
 from xds.utils.io import io_buffer
 
-_NO_XLATIONS_SPECIALS = ['LOB', 'PL', 'PI']
+_NO_XLATIONS_SPECIALS = [
+    'LOB',
+    'PL',
+    'FX',
+    'PI',
+    'NS',
+    'NSID',
+    'UID',
+    'UUID',
+    'URI',
+    'ARGS',
+    'KWS',
+    'KWARGS',
+]
 
 XlationMap: TypeAlias = Dict[str, Dict[str, str]]
 ic.configureOutput(prefix='DEBUG:', includeContext=True)
@@ -77,25 +94,6 @@ def is_pivot(df: pd.DataFrame) -> bool:
     return index_pivoted or column_pivoted
 
 
-def flat(data):
-    if isinstance(data, list):
-        return flatten(
-            {
-                k: flat(v) if isinstance(v, (list, dict)) else v
-                for item in data
-                for k, v in item.items()
-            }
-        )
-    elif isinstance(data, dict):
-        return flatten(
-            {
-                k: flat(v) if isinstance(v, (list, dict)) else v
-                for k, v in data.items()
-            }
-        )
-    return data
-
-
 def typed_list(
     dtype: type, values: Optional[str | List[Any]]
 ) -> Optional[List[Any]]:
@@ -111,7 +109,7 @@ def jinja_template(
 ) -> Template:
     jtemplate = f'{template}.jinja2'
     tpath = f'{tdir}/{jtemplate}'
-    return Template(io_buffer(file=tpath))
+    return Template(io_buffer(file=tpath), keep_trailing_newline=True)
 
 
 def jinja_render(
@@ -120,3 +118,28 @@ def jinja_render(
     template = template or kwargs.get('template')
     template = jinja_template(template)
     return template.render(**kwargs)
+
+
+def dict_flatten(
+    data: Dict[str, Any], delimiter: str = '.', prefix: str | None = None
+) -> Dict[str, Any]:
+    flat_dict = flatten(
+        data,
+        reducer=make_reducer(delimiter=delimiter),
+    )
+    prefix = f'{prefix}{delimiter}' if prefix else ''
+    return {f'{prefix}{k}': v for k, v in flat_dict.items()}
+
+
+def dict_unflatten(
+    data: Dict[str, Any], delimiter: str = '.', prefix: str | None = None
+) -> Dict[str, Any]:
+    unflat_dict = unflatten(
+        data,
+        splitter=make_splitter(delimiter=delimiter),
+    )
+    return unflat_dict.get(prefix) if prefix else unflat_dict
+
+
+def po(data: Any) -> str:
+    return pformat(data)

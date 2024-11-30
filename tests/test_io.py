@@ -12,7 +12,7 @@ from xds.utils.io import parser
 @pytest.fixture(scope='session')
 def io_data():
     data = {
-        'ydir': 'tests/blueprints',
+        'ydir': 'tests/fixtures',
         'url': (
             'x.go/xds?user.name=John&user.age=30&'
             'user.hobbies=reading,gaming&address.city=HongKong&address.zip=12345'

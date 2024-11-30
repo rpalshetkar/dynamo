@@ -8,7 +8,7 @@ from icecream import ic
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field, model_validator
 
-from xds.core.dynamo import augment, dynamic_model
+from legacy.dynamo_fn import audit, dynamic_model
 from xds.utils.helpers import SingletonMeta
 from xds.utils.io import io_path, parser
 from xds.utils.logger import log
@@ -16,11 +16,12 @@ from xds.utils.logger import log
 BLUEPRINTS = 'xds/catalogue/blueprints'
 CONFIGS = 'xds/configs'
 TEMPLATES = 'xds/catalogue/templates'
+ENVNAME = 'bootstrap'
 
 
 class Registry(metaclass=SingletonMeta):
     def __init__(self, **kwargs):
-        self.envname: str = kwargs.get('envname', 'prod')
+        self.envname: str = kwargs.get('env', ENVNAME)
         self.ns: Dict[str, Any] = kwargs.get('ns', {})
         self.blueprints: str = kwargs.get('blueprints', BLUEPRINTS)
         self.configs: str = kwargs.get('configs', CONFIGS)
@@ -64,7 +65,7 @@ class Registry(metaclass=SingletonMeta):
         assert model, 'Model not specified'
         cls = self.model(model)
         vars = parser(**kwargs)
-        vars.update(augment('instances', model, vars))
+        vars.update(audit('instances', model, vars))
         try:
             inst = cls(**vars)
             self._ns_init('instances', inst)
@@ -74,13 +75,13 @@ class Registry(metaclass=SingletonMeta):
             raise e
 
     @classmethod
-    def set_env(cls, envname: str) -> Any:
+    def set_env(cls, envname: str = ENVNAME) -> Any:
         envmf = f'{BLUEPRINTS}/env.yaml'
         env_cls = dynamic_model(parser(envmf))
         assert env_cls, f'Failed to create Env Model from {envmf}'
         envcf = f'{CONFIGS}/env.{envname}.yaml'
         vars = parser(envcf)
-        vars.update(augment('instances', 'Env', vars))
+        vars.update(audit('instances', 'Env', vars))
         env = env_cls(**vars)
         assert env, f'Failed to create Env from {envcf}'
         return env

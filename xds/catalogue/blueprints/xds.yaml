@@ -1,6 +1,5 @@
 kind: XDS
-protocol: str#in=service,agent,function,command,browser,scheduler
-uri: str
-env: str
-ds: str
-widget: str
+protocol: str#in=service,agent,callable,url,scheduler
+ds: xref=DS
+widget: xref=Widget
+lds: xref=DS

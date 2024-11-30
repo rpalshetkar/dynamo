@@ -1,8 +1,8 @@
-import inspect
 import re
 from datetime import datetime
 from pprint import pp
 from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from pydantic import (
     UUID4,
@@ -28,197 +28,25 @@ from xds.utils.io import parser
 from xds.utils.logger import ic, log
 
 
-from uuid import uuid4
-
-from pydantic import BaseModel, Field, model_validator
-
-from xds.utils.helpers import SingletonMeta
-from xds.utils.io import io_path, parser
-from xds.utils.logger import log
-
-BLUEPRINTS = 'xds/catalogue/blueprints'
-CONFIGS = 'xds/configs'
-TEMPLATES = 'xds/catalogue/templates'
-ENVNAME = 'bootstrap'
-
-
 class Dynamo(metaclass=SingletonMeta):
-    def __init__(self, **kwargs):
-        self.envname: str = kwargs.get('env', ENVNAME)
-        self.ns: Dict[str, Any] = kwargs.get('ns', {})
-        self.blueprints: str = kwargs.get('blueprints', BLUEPRINTS)
-        self.configs: str = kwargs.get('configs', CONFIGS)
-        self.templates: str = kwargs.get('templates', TEMPLATES)
-
-        self.models: Dict[str, Any] = {}
-        self.instances: Dict[str, Any] = {}
-        self.callables: Dict[str, Any] = {}
-        self.jinjas: Dict[str, Any] = {}
-        self._configs: Dict[str, Any] = {}
-        self.env: Any = None
-
-        self.envfile = f'{self.configs}/env.{self.envname}.yaml'
-
-        self._filecfgs('models', self.blueprints)
-        self._filecfgs('configs', self.configs)
-        assert self._filecfgs, 'No Configs seen in Registry'
-
-        env_cls = 'Env'
-        self.register_model(env_cls)
-        self.register_instance(env_cls, path=self.envfile)
-        self.env = self.obj(f'instances/{env_cls}/{self.envname}')
-        log.info(f'Env => {self.env.nsid}')
-        for model in self.env.models:
-            self.register_model(model)
-        self.allowed_callees = ['register_model']
-
-    def _filecfgs(self, what: str, dir: str):
-        files = parser(dir)
-        if not files.get('contents'):
-            raise ValueError(f'No model file contents seen in {dir}')
-        fconfigs = {f"{what}/{i['kind']}".lower(): i for i in files['contents']}
-        if fconfigs:
-            self._configs.update(fconfigs)
-
-    def register_model(self, model: str = None) -> Any:
-        model_ref = {}
-        try:
-            if model and isinstance(model, dict):
-                model_ref = model
-            else:
-                clscfg = self._configs.get(f'models/{model}'.lower())
-                assert clscfg, f'{model} Config not found'
-                model_ref = clscfg
-            cls_name = model_ref.get('kind')
-            cls = self.dynamic_model(model_ref)
-            self._ns_init('models', cls_name, cls)
-            return cls
-        except Exception as e:
-            log.error(f'Error registering model {model}: {e}')
-            raise e
-
-    def register_instance(self, model: Optional[str] = None, **kwargs) -> Any:
-        model = model or kwargs.get('kind')
-        assert model, 'Model not specified'
-        vars = parser(**kwargs)
-        vars.update(self._get_mixings('instances', model, vars))
-        try:
-            cls = self.model(model)
-            if not cls:
-                raise ValueError(f'Model {model} not found')
-            inst = cls(**vars)
-            self._ns_init('instances', model, inst)
-            return inst
-        except Exception as e:
-            log.error(f'Error registering instance {model}: {e}')
-            raise e
-
-    def dynamic_model(
-        self, data: Dict[str, Any], child: bool = False
-    ) -> BaseModel:
-
-        caller = inspect.stack()[1].function
-        callees = ['register_model', '_enrich_field']
-        if caller not in callees:
-            raise PermissionError(f"{caller} is not in {callees} for dynamic_model")
-
-        fields = {}
-        cls_name, _ = self._get_class_spec(data)
-        model = self.model(cls_name)
-        if model:
-            log.info(f'Returning {cls_name} from model registry cache')
-            return model
-        try:
-            cls_name, normalized_fields = self._parse_spec(data, child, fields)
-            cfg = ConfigDict(extra='forbid')
-            model = create_model(
-                cls_name,
-                **normalized_fields,
-                __config__=cfg,
-                __validators__={'before': Dynamo._before, 'after': Dynamo._after},
-            )
-            model.info = self._str_model_(model)
-            model.__str__ = self._str_instance_
-            model.meta = self._meta_model(model)
-            log.info(f'Creating model for {cls_name}')
-            #log.debug(f'Pydantic Model Info:\n{model.info}')
-            #log.debug(f'Metadata:\n{po(model.meta)}')
-            #self.models[cls_name] = model
-            return model
-        except Exception as e:
-            err = f'Error creating model {cls_name}: {e}'
-            log.error(err)
-            raise ValueError(err) from None
-
-    def set_env(self, envname: str = ENVNAME) -> Any:
-        envmf = f'{BLUEPRINTS}/env.yaml'
-        env_cls = self.dynamic_model(parser(envmf))
-        assert env_cls, f'Failed to create Env Model from {envmf}'
-        envcf = f'{CONFIGS}/env.{envname}.yaml'
-        vars = parser(envcf)
-        vars.update(self._get_mixings('instances', 'Env', vars))
-        env = env_cls(**vars)
-        assert env, f'Failed to create Env from {envcf}'
-        return env
-
-    def _ns_init(self, what: str, model: str, obj: Any) -> None:
-        oid = model.lower()
-        if what == 'models':
-            self.models[oid] = obj
-        elif what == 'instances':
-            oid = (obj.nsid or f'{model}/{obj.ns}').lower()
-            self.instances[oid] = obj
-        ns_id = f'{what}/{oid}'.lower()
-        obj.nsid = ns_id
-        self.ns[ns_id] = obj
-        log.info(f'Namespace => {ns_id} Initialized')
-
-    def locator(self, nskey: str) -> Any:
-        obj = self.ns.get(nskey.lower())
-        if obj:
-            return obj
-
-        parts = nskey.split('/')
-        if nskey.startswith('models/'):
-            obj = self.models.get(parts[1])
-            if obj:
-                return obj
-
-        if nskey.startswith('instances/'):
-            obj = self.instances.get(f'{parts[1]}/{parts[2]}')
-            if obj:
-                return obj
-            else:
-                last = f'/{parts[-1]}'
-                found = [i for i in self.ns if i.endswith(last)]
-                if len(found) == 1:
-                    log.info(f'Found {found[0]} for {nskey} with fuzzy search')
-                    return self.ns[found[0]]
-        return None
-
-    def model(self, clstr: str) -> Any:
-        return self.locator(f'models/{clstr}')
-
-    def obj(self, objkey: str) -> Any:
-        return self.locator(objkey)
-
-    instance = obj
-
-    def __str__(self) -> str:
-        data = [
-            ['Env', ic(self.env)],
-            ['Models', ic(self.models)],
-            ['Instances', ic(self.instances)],
-            ['Callables', ic(self.callables)],
+    def __init__(self):
+        self.blueprints = 'xds/catalogue/blueprints'
+        self.core_models = [
+            'Env',
+            'DS',
+            'Enums',
+            'Mail',
+            'Widget',
+            'XDS',
         ]
-        sep = '-' * 60 + '\n'
-        return sep.join(f'{header} ->{content}\n' for header, content in data)
-
+        self.models = {}
+        self._load_core_models()
 
     @staticmethod
-    def proxy_callback(method):
+    def proxy_method(method):
         def wrapper(self, *args, **kwargs):
             return getattr(self.__proxied__, method.__name__)(*args, **kwargs)
+
         return wrapper
 
     @staticmethod
@@ -244,8 +72,34 @@ class Dynamo(metaclass=SingletonMeta):
     def _meta_model(cls):  # noqa: PLW0211
         return {k: v.json_schema_extra for k, v in cls.model_fields.items()}
 
-    def restrict(self, callees: List[str]):
-        pass
+    def dynamic_model(
+        self, data: Dict[str, Any], child: bool = False
+    ) -> BaseModel:
+        fields = {}
+        cls_name, spec = self._parse_spec(data, child, fields)
+        if cls_name in self.models:
+            log.info(f'Returning {cls_name} from model registry')
+            return self.models[cls_name]
+        try:
+            cfg = ConfigDict(extra='forbid')
+            model = create_model(
+                cls_name,
+                **spec,
+                __config__=cfg,
+                __validators__={'before': Dynamo._before, 'after': Dynamo._after},
+            )
+            model.info = self._str_model_(model)
+            model.__str__ = self._str_instance_
+            model.meta = self._meta_model(model)
+            log.info(f'Creating model for {cls_name}')
+            #log.info(f'Pydantic Model Info:\n{model.info}')
+            #log.info(f'Metadata:\n{po(model.meta)}')
+            self.models[cls_name] = model
+            return model
+        except Exception as e:
+            err = f'Error creating model {cls_name}: {e}'
+            log.error(err)
+            raise ValueError(err) from None
 
     def _get_class_spec(self, data: Dict[str, Any]) -> Tuple[str, List[str]]:
         kind = data.get('kind')
@@ -276,6 +130,7 @@ class Dynamo(metaclass=SingletonMeta):
         for key, value in data.items():
             if isinstance(value, str) and 'xref=' in value:
                 xcls = re.sub('(xref=|#.*)', '', value)
+                log.info(f'Trying XREF {xcls} in registry')
                 if xcls_model := self.models.get(xcls):
                     meta = {
                         k: v['spec']
@@ -315,8 +170,6 @@ class Dynamo(metaclass=SingletonMeta):
                     'required': required,
                 }
             )
-            if key == 'kind':
-                meta['cls_name'] = value
             meta.update(spec)
 
         default = meta.get('defval', None)
@@ -324,15 +177,14 @@ class Dynamo(metaclass=SingletonMeta):
         field = Any
         if meta:
             meta = {k: v for k, v in meta.items() if v}
-            var, eng = xlate(key)
+            _, eng = xlate(key)
             meta['title'] = eng
-            meta['var'] = var
         if default:
-            field = Field(default=default, alias=var, json_schema_extra=meta)
+            field = Field(default=default, json_schema_extra=meta)
         elif required:
-            field = Field(Ellipsis, alias=var, json_schema_extra=meta)
+            field = Field(Ellipsis, json_schema_extra=meta)
         else:
-            field = Field(alias=var, json_schema_extra=meta)
+            field = Field(json_schema_extra=meta)
         if not required:
             field_type = Optional[field_type]
 
@@ -353,9 +205,21 @@ class Dynamo(metaclass=SingletonMeta):
             'kws': 'dict',
         }
 
+    def _load_core_models(self) -> Dict[str, Any]:
+        files = parser(self.blueprints)
+        if not files.get('contents'):
+            raise ValueError(
+                f'No model file contents seen in {self.blueprints}'
+            )
+        fconfigs = {i['kind']: i for i in files['contents']}
+        core_models = {}
+        for model in self.core_models:
+            core_models[model] = self.dynamic_model(fconfigs[model])
+        return core_models
+
     @staticmethod
     def _get_mixings(what: str, model: str, vars: Dict[str, Any]) -> Dict[str, Any]:
-        ns = '/'.join([i for i in [model, vars.get('ns')] if i])
+        ns = '/'.join([i for i in [what, model, vars.get('ns')] if i])
         uid = 'fta'
         ts = datetime.now().isoformat()
         return {
@@ -436,7 +300,7 @@ class Dynamo(metaclass=SingletonMeta):
                 setattr(
                     cls,
                     export,
-                    Dynamo.proxy_callback(val) if callable(val) else val,
+                    Dynamo.proxy_method(val) if callable(val) else val,
                 )
         except Exception as e:
             ic(f'Error setting proxy methods for {cls}: {e}')

@@ -1,16 +1,20 @@
-import random
-
 import pandas as pd
 from icecream import ic
 
-from tests.fixtures.tdf import FAKE_DFS
+from tests.df_mocks_fixtures import FAKE_DFS
 
 
 class DSLegacy:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.df = self._mock_df(**kwargs)
-        self.exports = ['df', 'create', 'increment', 'filter', 'stats']
+        self.exports = [
+            'df',
+            'increment',
+            'filter',
+            'stats',
+            'create',
+        ]
 
     @classmethod
     def create(cls, **kwargs):
@@ -26,6 +30,14 @@ class DSLegacy:
             'columns': self.df.columns.tolist(),
             'head': self.df.head(10),
         }
+
+    def save(self, **kwargs):
+        ic(f'Saving DF and adding {kwargs}')
+        return self.df
+
+    def delete(self, **kwargs):
+        ic(f'Deleting DF and adding {kwargs}')
+        return self.df
 
     def increment(self):
         self.df['processed'] = self.df['storypoint'] * 2

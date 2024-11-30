@@ -1,28 +1,32 @@
-DS:
-  kind: DS
-  ns: str
-  proxy: str=DSProxy
-  uri: str#req
-  protocol: str=http
+ComplexModel:
+    kind: ComplexModel
+    ds: xref=DS
+    lds: xref=DS#list
 
-Widget:
-  kind: Widget
-  proxy: str=WidgetProxy
-  type: enum=table,pivot,bar,line,gannt,heatmap,sankey
-  x: str
-  y: str
-  c: str
-  t: str
-  theme: str
-  orient: enum=h,v
-  total: bool
+ComplexModel2:
+    kind: ComplexModel2
+    intfld: int=12#key#in=17,18,19#any
+    bstr: str#req#key#any
+    nested1:
+        kind: ComplexModel21
+        aint: int#req#all
+        bstr: str=B Default#req#key#any
+        xy: int=15#key#any
+        ds: xref=DS
 
-Env:
-  kind: Env
-  ns: str=production
-  uri: str#req
-
-Registry:
-  kind: Registry
-  ns: str=registry
-  models: str=ds,widget,env,registry
+ComplexModel1:
+    kind: ComplexModel1
+    args: str#list#any#all
+    nested1:
+        kind: ComplexModel11
+        aint: int
+        bstr: str='B Default'#req#key
+        cfloatlist: float#list
+        nested2:
+            kind: ComplexModel112
+            aint: int
+            bstr: str='B Default'#req#key
+            cfloatlist: float=1.0,2.0,3.0#list
+            aintn2: int
+            bstr2: str='B Default'#req#key
+            cfloatlist2: float#list
